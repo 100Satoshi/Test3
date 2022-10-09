@@ -1,12 +1,10 @@
 package com.Test3.service;
 
+import com.Test3.client.ExchangeClient;
 import com.Test3.model.*;
 import com.Test3.repository.ConvertRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -21,41 +19,31 @@ public class ExchangeService {
 
     private final ConvertRepository convertRepository;
 
+    private final ExchangeClient exchangeClient;
+
     private final RatesModel ratesModel;
 
     public ConvertModelData exchange(Query query) {
-        ConvertModel convertModel = WebClient.create()
-                .get()
-                .uri(String.format(
-                        "https://api.apilayer.com/exchangerates_data/convert?to=%s&from=%s&amount=%s",
-                        query.getTo(),
-                        query.getFrom(),
-                        query.getAmount()))
-                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .header("apikey", "2rz2UiKOW48tq3BTVOo7kUomIqLHZ1uV")
-                .retrieve()
-                .bodyToMono(ConvertModel.class)
-                .block();
+        ConvertModel convertModel = exchangeClient.exchange(query);
         return convertRepository.save(ConvertModelData.fromConvertModel(convertModel, ratesModel));
     }
 
     public ExchangeStats exchangeStats() {
+        List<ConvertModelData> all = convertRepository.findAll();
         return ExchangeStats.builder()
-                .requestsFromLastHour(requestFromLastHour().size())
-                .mostPopularCurrencyFrom(mostPopularCurrencyFrom())
-                .largestTransactionRateInEURO(largestTransaction())
+                .requestsFromLastHour(convertRepository.findAllByTimestampAfter
+                        (Timestamp.valueOf(LocalDateTime.now().minusHours(1))).size())
+                .mostPopularCurrencyFrom(String.valueOf(convertRepository.findTopGroupingByFrom().toString()))
+                .largestTransactionRateInEURO(convertRepository.findFirstOrderByValInBaseCurrency())
                 .build();
     }
 
-    public List<ConvertModelData> requestFromLastHour() {
-        return convertRepository.findAll().stream()
-                .filter(convertModelData -> convertModelData.getTimestamp()
-                        .after(Timestamp.valueOf(LocalDateTime.now().minusHours(1))))
-                .collect(Collectors.toList());
+    public int requestFromLastHour() {
+        return convertRepository.findAllByTimestampAfter(Timestamp.valueOf(LocalDateTime.now().minusHours(1))).size();
     }
 
-    public String mostPopularCurrencyFrom() {
-        return convertRepository.findAll().stream()
+    public String mostPopularCurrencyFrom(List<ConvertModelData> all) {
+        return all.stream()
                 .map(data -> data.getFrom())
                 .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()))
                 .entrySet()
@@ -65,10 +53,11 @@ public class ExchangeService {
                 .getKey();
     }
 
-    public Double largestTransaction() {
-        return convertRepository.findAll().stream()
-                .mapToDouble(data -> data.getValueInBaseCurrency())
+    public Double largestTransaction(List<ConvertModelData> all) {
+        return all.stream()
+                .mapToDouble(data -> data.getValInBaseCurrency())
                 .max()
                 .orElseThrow(() -> new IllegalArgumentException());
     }
+
 }

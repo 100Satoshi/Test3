@@ -22,7 +22,7 @@ public class ExchangeController {
     }
 
     @GetMapping("/stats")
-    public ExchangeStats exchageStats() {
+    public ExchangeStats exchangeStats() {
         return exchangeService.exchangeStats();
     }
 
