@@ -15,22 +15,23 @@ import java.sql.Timestamp;
 @NoArgsConstructor
 @Builder
 @Getter
+@Table(name = "convert_model_data")
 public class ConvertModelData {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    @Column(name = "to_currency")
-    private String from;
     @Column(name = "from_currency")
+    private String from;
+    @Column(name = "to_currency")
     private String to;
     private double amount;
     private double result;
     @JsonFormat(pattern="yyyy-MM-dd HH:mm:ss")
     private Timestamp timestamp;
     @JsonIgnore
-    private double valueInBaseCurrency;
+    private double valInBaseCurrency;
 
     public static ConvertModelData fromConvertModel(ConvertModel convertModel, RatesModel ratesModel) {
         return ConvertModelData.builder()
@@ -39,11 +40,11 @@ public class ConvertModelData {
                 .amount(convertModel.getQuery().getAmount())
                 .result(convertModel.getResult())
                 .timestamp(new Timestamp(convertModel.getInfo().getTimestamp() * 1000L))
-                .valueInBaseCurrency(getValueInBaseCurrency(convertModel, ratesModel))
+                .valInBaseCurrency(getValInBaseCurrency(convertModel, ratesModel))
                 .build();
     }
 
-    private static double getValueInBaseCurrency(ConvertModel convertModel, RatesModel ratesModel) {
+    private static double getValInBaseCurrency(ConvertModel convertModel, RatesModel ratesModel) {
         String from = convertModel.getQuery().getFrom();
         double amount = convertModel.getQuery().getAmount();
         double rateInBaseCurrency = ratesModel.getRates().get(from);
